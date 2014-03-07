@@ -9,7 +9,7 @@
 
 ## Example
 
-First, set up [programattic billing access](http://docs.aws.amazon.com/awsaccountbilling/latest/about/programaccess.html).
+First, set up [programmatic billing access](http://docs.aws.amazon.com/awsaccountbilling/latest/about/programaccess.html).
 
 ```js
 var accountId = '1111-2222-3333';
