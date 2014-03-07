@@ -13,7 +13,7 @@
     "API"
   ],
   "dependencies": {
-    "bind": "0.0.2",
+    "bind": "git://github.com/ianstormtaylor/bind",
     "debug": "~0.7.4",
     "csv": "~0.3.7",
     "knox": "~0.8.9",
