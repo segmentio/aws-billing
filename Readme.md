@@ -29,14 +29,22 @@ billing(function (err, costs) {
 });
 ```
 
-The `costs` variable estimates your 30 day rolling billing costs for ec2 and non-ec2 costs:
+The `costs` variable shows the costs for the current billing period by product.
 
 ```js
-{
-    ec2: 13393,
-    nonEc2: 2493,
-    total: 15886
-}
+{ total: 4839.25,
+  start: Thu Jan 01 2015 00:00:00 GMT+0000 (UTC),
+  end: Thu Jan 08 2015 02:34:50 GMT+0000 (UTC),
+  products:
+   { 'data transfer': 432.12,
+     'elastic mapreduce': 864.43,
+     'cloudfront': 124.42,
+     'support (business)': 120.12,
+     'elasticache': 124.12,
+     'simple storage service': 172.46,
+     'redshift': 423.77,
+     'elastic compute cloud': 123.32,
+     'route 53': 454.73 } }
 ```
 
 ## License

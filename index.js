@@ -1,12 +1,10 @@
 
-var Batch = require('batch');
 var bind = require('bind');
 var csv = require('csv');
 var debug = require('debug')('aws-billing');
 var Ec2 = require('awssum-amazon-ec2').Ec2;
 var knox = require('knox');
-var once = require('once');
-var prices = require('./ec2-prices');
+var Dates = require('date-math');
 
 /**
  * Expose `AWSBilling`.
@@ -47,52 +45,28 @@ function AWSBilling (accountId, key, secret, bucket, region) {
  */
 
 AWSBilling.prototype.get = function (callback) {
-  new Batch(this.getEc2, this.getNonEc2).end(function (err, results) {
+  this.products(function (err, products) {
     if (err) return callback(err);
+    var total = 0.0;
+    Object.keys(products).forEach(function (product) {
+      total += products[product];
+    });
     callback(null, {
-      ec2: results[0],
-      nonEc2: results[1],
-      total: results[0] + results[1]
+      total: total,
+      start: Dates.month.floor(new Date()),
+      end: new Date(),
+      products: products
     });
   });
 };
 
 /**
- * Get the current cost of EC2 instances.
+ * Get the cost of AWS products
  *
  * @param {Function} callback
  */
 
-AWSBilling.prototype.getEc2 = function (callback) {
-  callback = once(callback); // hack: get rid of a horrible AWS sdk bug
-  var self = this;
-  debug('describing ec2 instances ..');
-  this.ec2.DescribeInstances(function(err, res) {
-    if (err) return callback(err);
-    var reservations = res.Body.DescribeInstancesResponse.reservationSet.item; // wow, wtf?
-    var instances = [];
-    reservations.forEach(function (r) {
-      var item = r.instancesSet.item;
-      if (Array.isArray(item)) instances.push.apply(instances, item);
-      else instances.push(item);
-    });
-    debug('described ec2 instances');
-    var cost = instances
-        .filter(function (i) { return i.instanceState.name === 'running'; })
-        .map(function (i) { return prices[i.instanceType] * 24 * 30; })
-        .reduce(function (memo, cost) { return memo + parseFloat(cost); }, 0);
-    debug('monthly ec2 cost: $%d', cost);
-    callback(null, cost);
-  });
-};
-
-/**
- * Get the cost of non-EC2 AWS stuff.
- *
- * @param {Function} callback
- */
-
-AWSBilling.prototype.getNonEc2 = function (callback) {
+AWSBilling.prototype.products = function (callback) {
   var accountId = this.accountId.replace(/-/g, '');
   var now = new Date();
   var file = accountId + '-aws-billing-csv-' +
@@ -104,19 +78,21 @@ AWSBilling.prototype.getNonEc2 = function (callback) {
     csv()
       .from.stream(stream)
       .to.array(function (data) {
-        var productCol = data[0].indexOf('ProductCode');
+        var products = {};
+        var productCol = data[0].indexOf('ProductCode') + 1;
         var costCol = data[0].indexOf('TotalCost');
-        var cost = data
-          .filter(function (row) {
-            return row[productCol] &&
-                   row[productCol] !== 'AmazonEC2' &&
-                   !isNaN(row[costCol]);
-          })
-          .reduce(function (memo, row) { return memo + parseFloat(row[costCol]); }, 0);
-        var monthFraction = new Date().getDate() / 30;
-        var rolling30DayCost = cost / monthFraction;
-        debug('rolling 30 days non-ec2 cost: %d', rolling30DayCost);
-        callback(err, rolling30DayCost);
+        data.forEach(function (row) {
+          var product = row[productCol].toLowerCase()
+            .replace(/amazon /, '')
+            .replace(/aws /, '');
+          var cost = parseFloat(row[costCol]);
+          if (product && cost > 0) {
+            if (!products[product]) products[product] = 0;
+            products[product] += cost;
+          }
+        });
+        debug('parsed AWS product costs');
+        callback(err, products);
       });
   });
 };
