@@ -21,16 +21,20 @@ module.exports = AWSBilling;
  * @param {String} secret
  * @param {String} bucket
  * @param {String} region
+ * @param {String} linkedAccountId
+ * @param {Boolean} withoutTaxes
  */
 
-function AWSBilling (accountId, key, secret, bucket, region) {
-  if (!(this instanceof AWSBilling)) return new AWSBilling(accountId, key, secret, bucket, region);
+function AWSBilling (accountId, key, secret, bucket, region, linkedAccountId=null, withoutTaxes=false) {
+  if (!(this instanceof AWSBilling)) return new AWSBilling(accountId, key, secret, bucket, region, linkedAccountId, withoutTaxes);
   if (!accountId) throw new Error('AWS Billing requires a accountId.');
   if (!key) throw new Error('AWS Billing requires a key.');
   if (!secret) throw new Error('AWS Billing requires a secret.');
   if (!bucket) throw new Error('AWS Billing requires a bucket.');
   if (!region) throw new Error('AWS Billing requires a region.');
   this.accountId = accountId;
+  this.linkedAccountId = linkedAccountId;
+  this.withoutTaxes = withoutTaxes;
   this.knox = knox.createClient({ key: key, secret: secret, bucket: bucket });
   this.ec2 = new Ec2({ accessKeyId: key, secretAccessKey: secret, region: region });
   var self = this;
@@ -69,8 +73,13 @@ AWSBilling.prototype.get = function (callback) {
 AWSBilling.prototype.products = function (callback) {
   var accountId = this.accountId.replace(/-/g, '');
   var now = new Date();
+  var withoutTaxes = this.withoutTaxes;
   var file = accountId + '-aws-billing-csv-' +
     now.getFullYear() + '-' + pad(now.getMonth() + 1, 2) + '.csv';
+  if (this.linkedAccountId) {
+    var linkedAccountId = this.linkedAccountId.replace(/-/g, '');
+    debug('linked account ID %s provided', linkedAccountId);
+  }
   debug('getting S3 file %s ..', file);
   this.knox.getFile(file, function (err, stream) {
     if (err) return callback(err);
@@ -80,15 +89,33 @@ AWSBilling.prototype.products = function (callback) {
       .to.array(function (data) {
         var products = {};
         var productCol = data[0].indexOf('ProductCode') + 1;
-        var costCol = data[0].indexOf('TotalCost');
+        if (withoutTaxes == true) {
+          var costCol = data[0].indexOf('CostBeforeTax');
+          debug('costCol is set to CostBeforeTax');
+        }
+        else {
+          var costCol = data[0].indexOf('TotalCost');
+          debug('costCol is set to TotalCost');
+        }
         data.forEach(function (row) {
           var product = row[productCol].toLowerCase()
             .replace(/amazon /, '')
             .replace(/aws /, '');
           var cost = parseFloat(row[costCol]);
-          if (product && cost > 0) {
-            if (!products[product]) products[product] = 0;
-            products[product] += cost;
+          if (linkedAccountId) {
+            var linkedAccountCol = data[0].indexOf('LinkedAccountId');
+            if (row[linkedAccountCol] == linkedAccountId) {
+              if (product && cost > 0) {
+                if (!products[product]) products[product] = 0;
+                products[product] += cost;
+              }
+            }
+          }
+          else {
+            if (product && cost > 0) {
+              if (!products[product]) products[product] = 0;
+              products[product] += cost;
+            }
           }
         });
         debug('parsed AWS product costs');
