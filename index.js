@@ -21,18 +21,20 @@ module.exports = AWSBilling;
  * @param {String} secret
  * @param {String} bucket
  * @param {String} region
+ * @param {String} month
  * @param {String} linkedAccountId
  * @param {Boolean} withoutTaxes
  */
 
-function AWSBilling (accountId, key, secret, bucket, region, linkedAccountId=null, withoutTaxes=false) {
-  if (!(this instanceof AWSBilling)) return new AWSBilling(accountId, key, secret, bucket, region, linkedAccountId, withoutTaxes);
+function AWSBilling (accountId, key, secret, bucket, region, month=null, linkedAccountId=null, withoutTaxes=false) {
+  if (!(this instanceof AWSBilling)) return new AWSBilling(accountId, key, secret, bucket, region, month, linkedAccountId, withoutTaxes);
   if (!accountId) throw new Error('AWS Billing requires a accountId.');
   if (!key) throw new Error('AWS Billing requires a key.');
   if (!secret) throw new Error('AWS Billing requires a secret.');
   if (!bucket) throw new Error('AWS Billing requires a bucket.');
   if (!region) throw new Error('AWS Billing requires a region.');
   this.accountId = accountId;
+  this.month = month;
   this.linkedAccountId = linkedAccountId;
   this.withoutTaxes = withoutTaxes;
   this.knox = knox.createClient({ key: key, secret: secret, bucket: bucket });
@@ -74,6 +76,14 @@ AWSBilling.prototype.products = function (callback) {
   var accountId = this.accountId.replace(/-/g, '');
   var now = new Date();
   var withoutTaxes = this.withoutTaxes;
+  if (this.month {
+    var file = accountId + '-aws-billing-csv-' +
+      now.getFullYear() + '-' + this.month + '.csv';
+  }
+  else {
+    var file = accountId + '-aws-billing-csv-' +
+      now.getFullYear() + '-' + pad(now.getMonth() + 1, 2) + '.csv';
+  }
   var file = accountId + '-aws-billing-csv-' +
     now.getFullYear() + '-' + pad(now.getMonth() + 1, 2) + '.csv';
   if (this.linkedAccountId) {
