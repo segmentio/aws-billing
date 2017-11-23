@@ -76,7 +76,7 @@ AWSBilling.prototype.products = function (callback) {
   var accountId = this.accountId.replace(/-/g, '');
   var now = new Date();
   var withoutTaxes = this.withoutTaxes;
-  if (this.month {
+  if (this.month) {
     var file = accountId + '-aws-billing-csv-' +
       now.getFullYear() + '-' + this.month + '.csv';
   }
