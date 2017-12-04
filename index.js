@@ -77,15 +77,16 @@ AWSBilling.prototype.products = function (callback) {
   var now = new Date();
   var withoutTaxes = this.withoutTaxes;
   if (this.month) {
+    debug('month provided %s ..', this.month);
     var file = accountId + '-aws-billing-csv-' +
-      now.getFullYear() + '-' + this.month + '.csv';
+      this.month + '.csv';
   }
   else {
+    debug('no month provided ..');
     var file = accountId + '-aws-billing-csv-' +
       now.getFullYear() + '-' + pad(now.getMonth() + 1, 2) + '.csv';
   }
-  var file = accountId + '-aws-billing-csv-' +
-    now.getFullYear() + '-' + pad(now.getMonth() + 1, 2) + '.csv';
+  debug('file to open is %s ..', file);
   if (this.linkedAccountId) {
     var linkedAccountId = this.linkedAccountId.replace(/-/g, '');
     debug('linked account ID %s provided', linkedAccountId);
