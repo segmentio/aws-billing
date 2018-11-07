@@ -16,7 +16,7 @@
     "bind": "git://github.com/ianstormtaylor/bind",
     "csv": "~0.3.7",
     "date-math": "0.0.1",
-    "debug": "~0.7.4",
+    "debug": "~0.7.4"
   },
   "devDependencies": {
     "mocha": "~1.17.1"
