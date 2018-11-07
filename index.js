@@ -2,8 +2,7 @@
 var bind = require('bind');
 var csv = require('csv');
 var debug = require('debug')('aws-billing');
-var Ec2 = require('awssum-amazon-ec2').Ec2;
-var knox = require('knox');
+var AWS = require('aws-sdk')
 var Dates = require('date-math');
 
 /**
@@ -34,11 +33,11 @@ function AWSBilling (accountId, key, secret, bucket, region, month=null, linkedA
   if (!bucket) throw new Error('AWS Billing requires a bucket.');
   if (!region) throw new Error('AWS Billing requires a region.');
   this.accountId = accountId;
+  this.bucket = bucket;
   this.month = month;
   this.linkedAccountId = linkedAccountId;
   this.withoutTaxes = withoutTaxes;
-  this.knox = knox.createClient({ key: key, secret: secret, bucket: bucket });
-  this.ec2 = new Ec2({ accessKeyId: key, secretAccessKey: secret, region: region });
+  this.AWS = new AWS.S3({ accessKeyId: key, secretAccessKey: secret, region: region });
   var self = this;
   bind.all(this);
   return function () { return self.get.apply(self, arguments); };
@@ -92,11 +91,11 @@ AWSBilling.prototype.products = function (callback) {
     debug('linked account ID %s provided', linkedAccountId);
   }
   debug('getting S3 file %s ..', file);
-  this.knox.getFile(file, function (err, stream) {
+  this.AWS.getObject({ Bucket: this.bucket, Key: file }, function (err, res) {
     if (err) return callback(err);
     debug('got S3 stream ..');
     csv()
-      .from.stream(stream)
+      .from.string(res.Body)
       .to.array(function (data) {
         var products = {};
         var productCol = data[0].indexOf('ProductCode') + 1;
