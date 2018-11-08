@@ -2,8 +2,7 @@
 var bind = require('bind');
 var csv = require('csv');
 var debug = require('debug')('aws-billing');
-var Ec2 = require('awssum-amazon-ec2').Ec2;
-var knox = require('knox');
+var AWS = require('aws-sdk')
 var Dates = require('date-math');
 
 /**
@@ -21,18 +20,24 @@ module.exports = AWSBilling;
  * @param {String} secret
  * @param {String} bucket
  * @param {String} region
+ * @param {String} month
+ * @param {String} linkedAccountId
+ * @param {Boolean} withoutTaxes
  */
 
-function AWSBilling (accountId, key, secret, bucket, region) {
-  if (!(this instanceof AWSBilling)) return new AWSBilling(accountId, key, secret, bucket, region);
+function AWSBilling (accountId, key, secret, bucket, region, month=null, linkedAccountId=null, withoutTaxes=false) {
+  if (!(this instanceof AWSBilling)) return new AWSBilling(accountId, key, secret, bucket, region, month, linkedAccountId, withoutTaxes);
   if (!accountId) throw new Error('AWS Billing requires a accountId.');
   if (!key) throw new Error('AWS Billing requires a key.');
   if (!secret) throw new Error('AWS Billing requires a secret.');
   if (!bucket) throw new Error('AWS Billing requires a bucket.');
   if (!region) throw new Error('AWS Billing requires a region.');
   this.accountId = accountId;
-  this.knox = knox.createClient({ key: key, secret: secret, bucket: bucket });
-  this.ec2 = new Ec2({ accessKeyId: key, secretAccessKey: secret, region: region });
+  this.bucket = bucket;
+  this.month = month;
+  this.linkedAccountId = linkedAccountId;
+  this.withoutTaxes = withoutTaxes;
+  this.AWS = new AWS.S3({ accessKeyId: key, secretAccessKey: secret, region: region });
   var self = this;
   bind.all(this);
   return function () { return self.get.apply(self, arguments); };
@@ -69,26 +74,58 @@ AWSBilling.prototype.get = function (callback) {
 AWSBilling.prototype.products = function (callback) {
   var accountId = this.accountId.replace(/-/g, '');
   var now = new Date();
-  var file = accountId + '-aws-billing-csv-' +
-    now.getFullYear() + '-' + pad(now.getMonth() + 1, 2) + '.csv';
+  var withoutTaxes = this.withoutTaxes;
+  if (this.month) {
+    debug('month provided %s ..', this.month);
+    var file = accountId + '-aws-billing-csv-' +
+      this.month + '.csv';
+  }
+  else {
+    debug('no month provided ..');
+    var file = accountId + '-aws-billing-csv-' +
+      now.getFullYear() + '-' + pad(now.getMonth() + 1, 2) + '.csv';
+  }
+  debug('file to open is %s ..', file);
+  if (this.linkedAccountId) {
+    var linkedAccountId = this.linkedAccountId.replace(/-/g, '');
+    debug('linked account ID %s provided', linkedAccountId);
+  }
   debug('getting S3 file %s ..', file);
-  this.knox.getFile(file, function (err, stream) {
+  this.AWS.getObject({ Bucket: this.bucket, Key: file }, function (err, res) {
     if (err) return callback(err);
     debug('got S3 stream ..');
     csv()
-      .from.stream(stream)
+      .from.string(res.Body)
       .to.array(function (data) {
         var products = {};
         var productCol = data[0].indexOf('ProductCode') + 1;
-        var costCol = data[0].indexOf('TotalCost');
+        if (withoutTaxes == true) {
+          var costCol = data[0].indexOf('CostBeforeTax');
+          debug('costCol is set to CostBeforeTax');
+        }
+        else {
+          var costCol = data[0].indexOf('TotalCost');
+          debug('costCol is set to TotalCost');
+        }
         data.forEach(function (row) {
           var product = row[productCol].toLowerCase()
             .replace(/amazon /, '')
             .replace(/aws /, '');
           var cost = parseFloat(row[costCol]);
-          if (product && cost > 0) {
-            if (!products[product]) products[product] = 0;
-            products[product] += cost;
+          if (linkedAccountId) {
+            var linkedAccountCol = data[0].indexOf('LinkedAccountId');
+            if (row[linkedAccountCol] == linkedAccountId) {
+              if (product && cost > 0) {
+                if (!products[product]) products[product] = 0;
+                products[product] += cost;
+              }
+            }
+          }
+          else {
+            if (product && cost > 0) {
+              if (!products[product]) products[product] = 0;
+              products[product] += cost;
+            }
           }
         });
         debug('parsed AWS product costs');

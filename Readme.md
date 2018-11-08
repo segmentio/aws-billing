@@ -29,6 +29,46 @@ billing(function (err, costs) {
 });
 ```
 
+You may optionally specify a month to query, using the format 'YYYY-MM', like so:
+
+```js
+var month = '2017-10';
+
+var billing = require('aws-billing')(accountId, key, secret, bucket, region, month);
+
+billing(function (err, costs) {
+    // ..
+```
+
+If no month is provided, the month you are in becomes the default.
+
+You may also optionally query an AWS Organizations "linked account", like so:
+
+```js
+var month = '2017-10';
+var linkedAccountId = '9999-8888-7777';
+
+var billing = require('aws-billing')(accountId, key, secret, bucket, region, month, linkedAccountId);
+
+billing(function (err, costs) {
+    // ..
+});
+```
+
+And / or you can request the totals before any sales taxes are added, like so:
+
+```js
+var month = '2017-10'; // we are querying October 2017
+var linkedAccountId = null; // we have no linked account
+var withoutTaxes = true; // but we want pre-sales-tax totals
+
+var billing = require('aws-billing')(accountId, key, secret, bucket, region, month, linkedAccountId, withoutTaxes);
+
+billing(function (err, costs) {
+    // ..
+});
+```
+
 The `costs` variable shows the costs for the current billing period by product.
 
 ```js
