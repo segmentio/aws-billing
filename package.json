@@ -1,6 +1,6 @@
 {
   "name": "aws-billing",
-  "version": "1.0.3",
+  "version": "1.0.1",
   "repository": "git://github.com/segmentio/aws-billing.git",
   "license": "MIT",
   "description": "AWS billing API for node",
